@@ -11,10 +11,10 @@ export const calculateMargin = (brokerEffective, affiliateEffective) => {
 
 // Check if too many values are static (validation)
 export const validateStaticValues = (staticValues) => {
+  const total = Object.values(staticValues).length;
   const staticCount = Object.values(staticValues).filter(Boolean).length;
-  // If more than 3 values are static, it's impossible to calculate
-  // We need at least 2 free variables to maintain the relationships
-  return staticCount <= 3;
+  // Need at least 2 dynamic (non-static) variables
+  return staticCount <= total - 2;
 };
 
 // Calculate with static constraints
@@ -26,8 +26,9 @@ export const calculateWithStaticConstraints = (newMargin, currentValues, staticV
     const affiliateEffective = calculateEffectiveValue(affiliateCPA, affiliateCRG);
     const brokerEffective = affiliateEffective / (1 - newMargin / 100);
     
-    if (staticValues.brokerCPA) {
-      // Keep broker CPA static, adjust broker CRG
+    // Determine which broker variable we can adjust
+    if (staticValues.brokerCPA && !staticValues.brokerCRG) {
+      // Broker CPA locked, adjust CRG
       const newBrokerCRG = brokerCPA > 0 ? (brokerEffective / brokerCPA) * 100 : 0;
       return {
         brokerCPA,
@@ -38,8 +39,20 @@ export const calculateWithStaticConstraints = (newMargin, currentValues, staticV
         brokerEffective: Math.round(brokerEffective * 100) / 100,
         affiliateEffective: Math.round(affiliateEffective * 100) / 100
       };
+    } else if (!staticValues.brokerCPA && staticValues.brokerCRG) {
+      // Broker CRG locked, adjust CPA
+      const newBrokerCPA = brokerCRG > 0 ? brokerEffective / (brokerCRG / 100) : 0;
+      return {
+        brokerCPA: Math.round(newBrokerCPA * 100) / 100,
+        brokerCRG,
+        affiliateCPA,
+        affiliateCRG,
+        margin: newMargin,
+        brokerEffective: Math.round(brokerEffective * 100) / 100,
+        affiliateEffective: Math.round(affiliateEffective * 100) / 100
+      };
     } else {
-      // Adjust broker CPA, keep broker CRG static
+      // Neither brokerCPA nor brokerCRG individually locked → default: adjust CPA
       const newBrokerCPA = brokerCRG > 0 ? brokerEffective / (brokerCRG / 100) : 0;
       return {
         brokerCPA: Math.round(newBrokerCPA * 100) / 100,
@@ -58,8 +71,9 @@ export const calculateWithStaticConstraints = (newMargin, currentValues, staticV
     const brokerEffective = calculateEffectiveValue(brokerCPA, brokerCRG);
     const affiliateEffective = brokerEffective * (1 - newMargin / 100);
     
-    if (staticValues.affiliateCPA) {
-      // Keep affiliate CPA static, adjust affiliate CRG
+    // Decide which affiliate variable to adjust
+    if (staticValues.affiliateCPA && !staticValues.affiliateCRG) {
+      // CPA locked, adjust CRG
       const newAffiliateCRG = affiliateCPA > 0 ? (affiliateEffective / affiliateCPA) * 100 : 0;
       return {
         brokerCPA,
@@ -70,8 +84,20 @@ export const calculateWithStaticConstraints = (newMargin, currentValues, staticV
         brokerEffective: Math.round(brokerEffective * 100) / 100,
         affiliateEffective: Math.round(affiliateEffective * 100) / 100
       };
+    } else if (!staticValues.affiliateCPA && staticValues.affiliateCRG) {
+      // CRG locked, adjust CPA
+      const newAffiliateCPA = affiliateCRG > 0 ? affiliateEffective / (affiliateCRG / 100) : 0;
+      return {
+        brokerCPA,
+        brokerCRG,
+        affiliateCPA: Math.round(newAffiliateCPA * 100) / 100,
+        affiliateCRG,
+        margin: newMargin,
+        brokerEffective: Math.round(brokerEffective * 100) / 100,
+        affiliateEffective: Math.round(affiliateEffective * 100) / 100
+      };
     } else {
-      // Adjust affiliate CPA, keep affiliate CRG static
+      // Neither locked, default adjust CPA
       const newAffiliateCPA = affiliateCRG > 0 ? affiliateEffective / (affiliateCRG / 100) : 0;
       return {
         brokerCPA,

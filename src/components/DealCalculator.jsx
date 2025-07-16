@@ -39,7 +39,10 @@ const DealCalculator = () => {
     brokerTerms: false,
     affiliateTerms: false,
     brokerCPA: false,
-    affiliateCPA: false
+    affiliateCPA: false,
+    brokerCRG: false,
+    affiliateCRG: false,
+    margin: false
   })
 
   const [showCalculations, setShowCalculations] = useState(true)
@@ -73,7 +76,7 @@ const DealCalculator = () => {
 
   // Handle slider changes (sync with text input)
   const handleSliderChange = useCallback((field, value) => {
-    const numValue = parseFloat(value) || 0
+    const numValue = Math.round((parseFloat(value) || 0) * 100) / 100
     setInputValues(prev => ({
       ...prev,
       [field]: numValue
@@ -191,9 +194,21 @@ const DealCalculator = () => {
 
   const MarginControl = () => (
     <div className="card">
-      <label className="label flex items-center gap-2">
-        <Percent className="h-4 w-4 text-green-500" />
-        Your Margin
+      <label className="label flex items-center gap-2 justify-between">
+        <div className="flex items-center gap-2">
+          <Percent className="h-4 w-4 text-green-500" />
+          Your Margin
+        </div>
+        <button
+          onClick={() => toggleStatic('margin')}
+          className={`p-1 rounded transition-colors ${
+            staticValues.margin 
+              ? 'bg-yellow-600 text-white hover:bg-yellow-700' 
+              : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+          }`}
+        >
+          {staticValues.margin ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}
+        </button>
       </label>
       <div className="space-y-4">
         {/* Text Input */}
@@ -202,10 +217,11 @@ const DealCalculator = () => {
             type="number"
             value={inputValues.margin}
             onChange={(e) => handleInputChange('margin', e.target.value)}
-            className="input-field pr-8"
+            className={`input-field pr-8 ${staticValues.margin ? 'bg-yellow-900/30 border-yellow-600' : ''}`}
             step="0.01"
             min="0"
             max="100"
+            disabled={staticValues.margin}
           />
           <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 font-mono">
             %
@@ -221,6 +237,7 @@ const DealCalculator = () => {
             step="0.1"
             value={inputValues.margin}
             onChange={(e) => handleSliderChange('margin', e.target.value)}
+            disabled={staticValues.margin}
             className="slider w-full"
           />
           <div className="flex justify-between items-center">
@@ -386,7 +403,8 @@ const DealCalculator = () => {
             suffix="%"
             icon={Target}
             color="blue"
-            isStatic={staticValues.brokerTerms}
+            isStatic={staticValues.brokerTerms || staticValues.brokerCRG}
+            onToggleStatic={() => toggleStatic('brokerCRG')}
           />
         </div>
 
@@ -426,7 +444,8 @@ const DealCalculator = () => {
             suffix="%"
             icon={Target}
             color="purple"
-            isStatic={staticValues.affiliateTerms}
+            isStatic={staticValues.affiliateTerms || staticValues.affiliateCRG}
+            onToggleStatic={() => toggleStatic('affiliateCRG')}
           />
         </div>
 
