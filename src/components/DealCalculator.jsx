@@ -9,6 +9,7 @@ import {
   recalculateFromAffiliateCRG,
   calculateWithStaticConstraints,
   validateStaticValues,
+  recalcForLockedMargin,
   formatCurrency,
   formatPercentage
 } from '../utils/calculations'
@@ -45,6 +46,8 @@ const DealCalculator = () => {
     margin: false
   })
 
+  const [lastChanged, setLastChanged] = useState('');
+
   const [showCalculations, setShowCalculations] = useState(true)
   const [isCalculating, setIsCalculating] = useState(false)
   const [calculationError, setCalculationError] = useState('')
@@ -67,6 +70,7 @@ const DealCalculator = () => {
   // Handle input changes (no calculation)
   const handleInputChange = useCallback((field, value) => {
     const numValue = parseFloat(value) || 0
+    setLastChanged(field);
     setInputValues(prev => ({
       ...prev,
       [field]: numValue
@@ -76,7 +80,8 @@ const DealCalculator = () => {
 
   // Handle slider changes (sync with text input)
   const handleSliderChange = useCallback((field, value) => {
-    const numValue = Math.round((parseFloat(value) || 0) * 100) / 100
+    const numValue = parseFloat(value) || 0
+    setLastChanged(field);
     setInputValues(prev => ({
       ...prev,
       [field]: numValue
@@ -116,25 +121,31 @@ const DealCalculator = () => {
         return
       }
 
-      // If margin changed and we have static constraints, use special logic
-      if (inputValues.margin !== values.margin && (staticValues.brokerTerms || staticValues.affiliateTerms)) {
+      // Case 1: user modified margin (lastChanged === 'margin') or margin input differs
+      if (lastChanged === 'margin' || (inputValues.margin !== values.margin)) {
         const newValues = calculateWithStaticConstraints(inputValues.margin, inputValues, staticValues)
         setValues(newValues)
         setInputValues(newValues)
-      } else {
-        // Standard recalculation based on most recently changed value
-        // For now, we'll recalculate maintaining the current margin unless margin was specifically changed
+      }
+      // Case 2: margin is locked, adjust other variables to keep margin
+      else if (staticValues.margin) {
+        const newValues = recalcForLockedMargin(inputValues, staticValues, lastChanged)
+        setValues(newValues)
+        setInputValues(newValues)
+      }
+      // Case 3: standard recalculation (margin free)
+      else {
         const brokerEffective = calculateEffectiveValue(inputValues.brokerCPA, inputValues.brokerCRG)
         const affiliateEffective = calculateEffectiveValue(inputValues.affiliateCPA, inputValues.affiliateCRG)
         const currentMargin = calculateMargin(brokerEffective, affiliateEffective)
-        
+
         const newValues = {
           ...inputValues,
           margin: Math.round(currentMargin * 100) / 100,
           brokerEffective: Math.round(brokerEffective * 100) / 100,
           affiliateEffective: Math.round(affiliateEffective * 100) / 100
         }
-        
+
         setValues(newValues)
         setInputValues(newValues)
       }
@@ -143,7 +154,7 @@ const DealCalculator = () => {
     }
     
     setTimeout(() => setIsCalculating(false), 200)
-  }, [inputValues, values, staticValues])
+  }, [inputValues, values, staticValues, lastChanged])
 
   const InputField = ({ label, value, onChange, field, prefix = '', suffix = '', icon: Icon, color = 'primary', isStatic = false, onToggleStatic = null }) => (
     <div className={`card transition-all duration-300 ${isStatic ? 'ring-2 ring-yellow-500 bg-yellow-900/20' : ''}`}>

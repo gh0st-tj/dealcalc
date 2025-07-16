@@ -196,6 +196,137 @@ export const recalculateFromMargin = (brokerCPA, brokerCRG, affiliateCRG, newMar
   };
 };
 
+// Calculate when margin is locked but other variables changed
+export const recalcForLockedMargin = (currentValues, staticValues, lastChanged) => {
+  const {
+    brokerCPA,
+    brokerCRG,
+    affiliateCPA,
+    affiliateCRG,
+    margin
+  } = currentValues;
+
+  const brokerEffective = calculateEffectiveValue(brokerCPA, brokerCRG);
+  const targetAffiliateEffective = brokerEffective * (1 - margin / 100);
+
+  const brokerSideLocked = staticValues.brokerTerms || (staticValues.brokerCPA && staticValues.brokerCRG);
+  const affiliateSideLocked = staticValues.affiliateTerms || (staticValues.affiliateCPA && staticValues.affiliateCRG);
+
+  // Helper rounding
+  const rnd = (num) => Math.round(num * 100) / 100;
+
+  // Try adjusting affiliate side first if not fully locked
+  if (!affiliateSideLocked) {
+    // Decide which affiliate variable we can adjust
+    if (staticValues.affiliateCPA && !staticValues.affiliateCRG) {
+      // CPA locked, adjust CRG
+      const newAffiliateCRG = affiliateCPA > 0 ? (targetAffiliateEffective / affiliateCPA) * 100 : 0;
+      return {
+        ...currentValues,
+        affiliateCRG: rnd(newAffiliateCRG),
+        brokerEffective: rnd(brokerEffective),
+        affiliateEffective: rnd(targetAffiliateEffective)
+      };
+    }
+    if (!staticValues.affiliateCPA && staticValues.affiliateCRG) {
+      // CRG locked, adjust CPA
+      const newAffiliateCPA = affiliateCRG > 0 ? targetAffiliateEffective / (affiliateCRG / 100) : 0;
+      return {
+        ...currentValues,
+        affiliateCPA: rnd(newAffiliateCPA),
+        brokerEffective: rnd(brokerEffective),
+        affiliateEffective: rnd(targetAffiliateEffective)
+      };
+    }
+    // Neither individually locked → adjust the variable that was NOT last changed
+    if (lastChanged === 'affiliateCPA' && !staticValues.affiliateCRG) {
+      const newAffiliateCRG = affiliateCPA > 0 ? (targetAffiliateEffective / affiliateCPA) * 100 : 0;
+      return {
+        ...currentValues,
+        affiliateCRG: rnd(newAffiliateCRG),
+        brokerEffective: rnd(brokerEffective),
+        affiliateEffective: rnd(targetAffiliateEffective)
+      };
+    }
+    if (lastChanged === 'affiliateCRG' && !staticValues.affiliateCPA) {
+      const newAffiliateCPA = affiliateCRG > 0 ? targetAffiliateEffective / (affiliateCRG / 100) : 0;
+      return {
+        ...currentValues,
+        affiliateCPA: rnd(newAffiliateCPA),
+        brokerEffective: rnd(brokerEffective),
+        affiliateEffective: rnd(targetAffiliateEffective)
+      };
+    }
+    // default: adjust affiliateCPA
+    const newAffiliateCPA = affiliateCRG > 0 ? targetAffiliateEffective / (affiliateCRG / 100) : 0;
+    return {
+      ...currentValues,
+      affiliateCPA: rnd(newAffiliateCPA),
+      brokerEffective: rnd(brokerEffective),
+      affiliateEffective: rnd(targetAffiliateEffective)
+    };
+  }
+
+  // Otherwise adjust broker side if available
+  if (!brokerSideLocked) {
+    // brokerEffective already computed, targetBrokerEffective = brokerEffective (since broker side is current), but we might adjust to match targetAffiliateEffective via margin formula.
+    const targetBrokerEffective = targetAffiliateEffective / (1 - margin / 100);
+
+    if (staticValues.brokerCPA && !staticValues.brokerCRG) {
+      // CPA locked, adjust CRG
+      const newBrokerCRG = brokerCPA > 0 ? (targetBrokerEffective / brokerCPA) * 100 : 0;
+      return {
+        ...currentValues,
+        brokerCRG: rnd(newBrokerCRG),
+        brokerEffective: rnd(targetBrokerEffective),
+        affiliateEffective: rnd(targetAffiliateEffective)
+      };
+    }
+    if (!staticValues.brokerCPA && staticValues.brokerCRG) {
+      // CRG locked, adjust CPA
+      const newBrokerCPA = brokerCRG > 0 ? targetBrokerEffective / (brokerCRG / 100) : 0;
+      return {
+        ...currentValues,
+        brokerCPA: rnd(newBrokerCPA),
+        brokerEffective: rnd(targetBrokerEffective),
+        affiliateEffective: rnd(targetAffiliateEffective)
+      };
+    }
+
+    // Neither individually locked → adjust the variable opposite to lastChanged if possible
+    if (lastChanged === 'brokerCPA' && !staticValues.brokerCRG) {
+      const newBrokerCRG = brokerCPA > 0 ? (targetBrokerEffective / brokerCPA) * 100 : 0;
+      return {
+        ...currentValues,
+        brokerCRG: rnd(newBrokerCRG),
+        brokerEffective: rnd(targetBrokerEffective),
+        affiliateEffective: rnd(targetAffiliateEffective)
+      };
+    }
+    if (lastChanged === 'brokerCRG' && !staticValues.brokerCPA) {
+      const newBrokerCPA = brokerCRG > 0 ? targetBrokerEffective / (brokerCRG / 100) : 0;
+      return {
+        ...currentValues,
+        brokerCPA: rnd(newBrokerCPA),
+        brokerEffective: rnd(targetBrokerEffective),
+        affiliateEffective: rnd(targetAffiliateEffective)
+      };
+    }
+
+    // default adjust brokerCPA
+    const newBrokerCPA = brokerCRG > 0 ? targetBrokerEffective / (brokerCRG / 100) : 0;
+    return {
+      ...currentValues,
+      brokerCPA: rnd(newBrokerCPA),
+      brokerEffective: rnd(targetBrokerEffective),
+      affiliateEffective: rnd(targetAffiliateEffective)
+    };
+  }
+
+  // If we reach here, unsolvable
+  return currentValues;
+};
+
 // Utility function to format currency
 export const formatCurrency = (value) => {
   return new Intl.NumberFormat('en-US', {
