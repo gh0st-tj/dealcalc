@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Calculator, ArrowRight, Info, DollarSign, Target, Percent, Lock, Unlock, AlertCircle } from 'lucide-react'
 import { solveDeal, getCalculationError } from '../utils/calculations'
-import { formatCurrency, formatPercentage } from '../utils/formatting'
+import { formatCurrency, formatPercentage } from '../utils/formatting.js'
 
 const InputField = React.memo(({ label, value, onChange, field, prefix = '', suffix = '', icon: Icon, color = 'primary', isStatic = false, onToggleStatic = null }) => (
   <div className={`card transition-all duration-300 ${isStatic ? 'ring-2 ring-yellow-500 bg-yellow-900/20' : ''}`}>
@@ -374,7 +374,7 @@ const DealCalculator = () => {
         <button
           onClick={performCalculation}
           disabled={isCalculating}
-          className="px-12 py-4 rounded-xl font-semibold text-lg"
+          className={`px-12 py-4 rounded-xl font-semibold text-lg transition-all flex items-center gap-3 ${isCalculating ? 'bg-gray-600 cursor-not-allowed text-gray-300' : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-2xl'}`}
         >
           <Calculator className={`h-6 w-6 ${isCalculating ? 'animate-spin' : ''}`} />
           {isCalculating ? 'Calculating...' : 'Calculate Deal'}
