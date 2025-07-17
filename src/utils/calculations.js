@@ -10,24 +10,28 @@ export const calculateMargin = (brokerEffective, affiliateEffective) => {
 export const getCalculationError = (statics) => {
     const { brokerTerms, affiliateTerms, brokerCPA, brokerCRG, affiliateCPA, affiliateCRG, margin } = statics;
 
-    if (brokerTerms && affiliateTerms) {
-        return "Cannot lock both Broker and Affiliate terms at the same time.";
-    }
-    
+    // Check if broker side is fully locked (both CPA and CRG)
     const brokerSideLocked = brokerTerms || (brokerCPA && brokerCRG);
+    // Check if affiliate side is fully locked (both CPA and CRG)  
     const affiliateSideLocked = affiliateTerms || (affiliateCPA && affiliateCRG);
 
+    // Only error if ALL THREE sides are fully locked - then there's nothing to calculate
     if (brokerSideLocked && affiliateSideLocked && margin) {
         return "Cannot solve. All three sides (Broker, Affiliate, Margin) are locked.";
     }
-    if (brokerSideLocked && affiliateSideLocked) {
-        return "Cannot calculate margin. Both Broker and Affiliate terms are locked.";
-    }
     
+    // Count total individual field locks to prevent over-constraining
     const numLocked = [brokerCPA, brokerCRG, affiliateCPA, affiliateCRG, margin].filter(Boolean).length;
     if (numLocked >= 5) {
         return "Too many variables are locked. At least one must be dynamic.";
     }
+
+    // All other combinations are valid:
+    // - Both broker & affiliate locked → can calculate margin ✅
+    // - Broker & margin locked → can calculate affiliate ✅  
+    // - Affiliate & margin locked → can calculate broker ✅
+    // - Only one side locked → can calculate other two ✅
+    // - Nothing locked → can calculate from current values ✅
 
     return null;
 }

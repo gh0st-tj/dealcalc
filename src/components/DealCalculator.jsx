@@ -225,6 +225,7 @@ const DealCalculator = () => {
   const [values, setValues] = useState({
     brokerCPA: 1200,
     brokerCRG: 10,
+    brokerEPL: 120, // EPL = CPA × (CRG / 100) = 1200 × 0.1 = 120
     affiliateCPA: 1000,
     affiliateCRG: 10,
     affiliateCPL: 100,
@@ -236,6 +237,7 @@ const DealCalculator = () => {
   const [inputValues, setInputValues] = useState({
     brokerCPA: 1200,
     brokerCRG: 10,
+    brokerEPL: 120, // EPL = CPA × (CRG / 100) = 1200 × 0.1 = 120
     affiliateCPA: 1000,
     affiliateCRG: 10,
     affiliateCPL: 100, // CPL = CPA × (CRG / 100) = 1000 × 0.1 = 100
@@ -261,13 +263,18 @@ const DealCalculator = () => {
   useEffect(() => {
     // Sync inputs on initial load
     const initialValues = solveDeal(inputValues, staticValues);
-    // Calculate initial CPL
+    
+    // Calculate initial EPL and CPL
+    const initialEPL = initialValues.brokerCPA && initialValues.brokerCRG 
+      ? (initialValues.brokerCPA * (initialValues.brokerCRG / 100)) 
+      : 120;
     const initialCPL = initialValues.affiliateCPA && initialValues.affiliateCRG 
       ? (initialValues.affiliateCPA * (initialValues.affiliateCRG / 100)) 
       : 100;
     
     const completeInitialValues = {
       ...initialValues,
+      brokerEPL: Math.round(initialEPL * 100) / 100,
       affiliateCPL: Math.round(initialCPL * 100) / 100
     };
     
@@ -292,13 +299,17 @@ const DealCalculator = () => {
       setCalculationError('');
       const newValues = solveDeal(inputValues, staticValues);
       
-      // Calculate CPL for the new values
+      // Calculate EPL and CPL for the new values
+      const newEPL = newValues.brokerCPA && newValues.brokerCRG 
+        ? (newValues.brokerCPA * (newValues.brokerCRG / 100)) 
+        : inputValues.brokerEPL || 0;
       const newCPL = newValues.affiliateCPA && newValues.affiliateCRG 
         ? (newValues.affiliateCPA * (newValues.affiliateCRG / 100)) 
         : inputValues.affiliateCPL || 0;
       
       const completeNewValues = {
         ...newValues,
+        brokerEPL: Math.round(newEPL * 100) / 100,
         affiliateCPL: Math.round(newCPL * 100) / 100
       };
       
@@ -376,6 +387,48 @@ const DealCalculator = () => {
         ...prev,
         affiliateCPA: numValue,
         affiliateCPL: Math.round(newCPL * 100) / 100 // Round to 2 decimal places
+      };
+    });
+  }, []);
+
+  // Specialized handler for broker CRG that syncs with EPL
+  const handleBrokerCRGChange = useCallback((field, value) => {
+    debugLog('BROKER_CRG_CHANGE', field, { newValue: value });
+    const numValue = value === '' ? '' : parseFloat(value);
+    setInputValues(prev => {
+      const newEPL = prev.brokerCPA && numValue ? (prev.brokerCPA * (numValue / 100)) : 0;
+      return {
+        ...prev,
+        brokerCRG: numValue,
+        brokerEPL: Math.round(newEPL * 100) / 100 // Round to 2 decimal places
+      };
+    });
+  }, []);
+
+  // Specialized handler for broker EPL that syncs with CRG
+  const handleBrokerEPLChange = useCallback((field, value) => {
+    debugLog('BROKER_EPL_CHANGE', field, { newValue: value });
+    const numValue = value === '' ? '' : parseFloat(value);
+    setInputValues(prev => {
+      const newCRG = prev.brokerCPA && numValue ? ((numValue / prev.brokerCPA) * 100) : 0;
+      return {
+        ...prev,
+        brokerEPL: numValue,
+        brokerCRG: Math.round(newCRG * 100) / 100 // Round to 2 decimal places
+      };
+    });
+  }, []);
+
+  // Specialized handler for broker CPA that syncs EPL when CRG is set
+  const handleBrokerCPAChange = useCallback((field, value) => {
+    debugLog('BROKER_CPA_CHANGE', field, { newValue: value });
+    const numValue = value === '' ? '' : parseFloat(value);
+    setInputValues(prev => {
+      const newEPL = numValue && prev.brokerCRG ? (numValue * (prev.brokerCRG / 100)) : prev.brokerEPL;
+      return {
+        ...prev,
+        brokerCPA: numValue,
+        brokerEPL: Math.round(newEPL * 100) / 100 // Round to 2 decimal places
       };
     });
   }, []);
@@ -544,13 +597,17 @@ const DealCalculator = () => {
 
     const newValues = solveDeal(inputValues, staticValues);
     
-    // Calculate CPL for the new values
+    // Calculate EPL and CPL for the new values
+    const newEPL = newValues.brokerCPA && newValues.brokerCRG 
+      ? (newValues.brokerCPA * (newValues.brokerCRG / 100)) 
+      : inputValues.brokerEPL || 0;
     const newCPL = newValues.affiliateCPA && newValues.affiliateCRG 
       ? (newValues.affiliateCPA * (newValues.affiliateCRG / 100)) 
       : inputValues.affiliateCPL || 0;
     
     const completeNewValues = {
       ...newValues,
+      brokerEPL: Math.round(newEPL * 100) / 100,
       affiliateCPL: Math.round(newCPL * 100) / 100
     };
     
@@ -698,7 +755,7 @@ const DealCalculator = () => {
           <InputField
             label="Broker CPA"
             value={inputValues.brokerCPA}
-            onChange={handleInputChange}
+            onChange={handleBrokerCPAChange}
             field="brokerCPA"
             prefix="$"
             icon={DollarSign}
@@ -708,19 +765,34 @@ const DealCalculator = () => {
             isLockDisabled={!isLockAllowed('brokerCPA')}
             onSoloMode={() => handleSoloMode('brokerCPA')}
           />
-          <InputField
-            label="Broker CRG"
-            value={inputValues.brokerCRG}
-            onChange={handleInputChange}
-            field="brokerCRG"
-            suffix="%"
-            icon={Target}
-            color="blue"
-            isStatic={staticValues.brokerTerms || staticValues.brokerCRG}
-            onToggleStatic={() => toggleStatic('brokerCRG')}
-            isLockDisabled={!isLockAllowed('brokerCRG')}
-            onSoloMode={() => handleSoloMode('brokerCRG')}
-          />
+          <div className="space-y-4">
+            <InputField
+              label="Broker CRG"
+              value={inputValues.brokerCRG}
+              onChange={handleBrokerCRGChange}
+              field="brokerCRG"
+              suffix="%"
+              icon={Target}
+              color="blue"
+              isStatic={staticValues.brokerTerms || staticValues.brokerCRG}
+              onToggleStatic={() => toggleStatic('brokerCRG')}
+              isLockDisabled={!isLockAllowed('brokerCRG')}
+              onSoloMode={() => handleSoloMode('brokerCRG')}
+            />
+            <InputField
+              label="Broker EPL"
+              value={inputValues.brokerEPL}
+              onChange={handleBrokerEPLChange}
+              field="brokerEPL"
+              prefix="$"
+              icon={Target}
+              color="blue"
+              isStatic={staticValues.brokerTerms || staticValues.brokerCRG} // EPL follows CRG static state
+              onToggleStatic={null} // EPL doesn't have its own lock, follows CRG
+              isLockDisabled={false}
+              onSoloMode={null} // EPL doesn't have solo mode
+            />
+          </div>
         </div>
 
         <div className="space-y-6">
@@ -766,7 +838,7 @@ const DealCalculator = () => {
           <div className="space-y-4">
             <InputField
               label="Affiliate CRG"
-              value={typeof inputValues.affiliateCRG === 'number' ? inputValues.affiliateCRG.toFixed(2) : inputValues.affiliateCRG}
+              value={inputValues.affiliateCRG}
               onChange={handleAffiliateCRGChange}
               field="affiliateCRG"
               suffix="%"
