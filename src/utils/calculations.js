@@ -306,17 +306,4 @@ export const recalcForLockedMargin = (currentValues, staticValues, lastChanged) 
   return currentValues;
 };
 
-// Utility function to format currency
-export const formatCurrency = (value) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(value || 0);
-};
-
-// Utility function to format percentage
-export const formatPercentage = (value) => {
-  return `${(value || 0).toFixed(2)}%`;
-}; 
+ 
